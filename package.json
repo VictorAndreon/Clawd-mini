@@ -1,0 +1,23 @@
+{
+  "name": "clawd-mini",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Mascote de desktop que reage ao Claude Code",
+  "main": "dist/src/main/main.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "npm run build && node scripts/start.js",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\"",
+    "print-hooks": "node scripts/print-hooks.js",
+    "simulate": "./scripts/simulate.sh",
+    "import-assets": "./scripts/import-clawd-assets.sh",
+    "install-autostart": "node scripts/install-autostart.js",
+    "uninstall-autostart": "node scripts/install-autostart.js --uninstall"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "electron": "^44.4.5",
+    "typescript": "~5.9.3"
+  }
+}
