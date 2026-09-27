@@ -1,0 +1,28 @@
+{
+  "name": "clawd",
+  "viewBox": "-15 -25 45 45",
+  "states": {
+    "idle":       "clawd-idle-follow.svg",
+    "thinking":   "clawd-working-thinking.svg",
+    "working":    "clawd-working-typing.svg",
+    "typing":     "clawd-working-typing.svg",
+    "building":   "clawd-working-building.svg",
+    "juggling":   "clawd-headphones-groove.svg",
+    "juggling2":  "clawd-working-juggling.svg",
+    "attention":  "clawd-notification.svg",
+    "done":       "clawd-happy.svg",
+    "error":      "clawd-error.svg",
+    "sweeping":   "clawd-working-sweeping.svg",
+    "yawning":    "clawd-idle-yawn.svg",
+    "dozing":     "clawd-idle-doze.svg",
+    "collapsing": "clawd-collapse-sleep.svg",
+    "sleeping":   "clawd-sleeping.svg",
+    "waking":     "clawd-wake.svg",
+    "drag":       "clawd-react-drag.svg"
+  },
+  "idleVariations": [
+    { "file": "clawd-idle-look.svg",    "durationMs": 6500 },
+    { "file": "clawd-idle-bubble.svg",  "durationMs": 13500 },
+    { "file": "clawd-idle-reading.svg", "durationMs": 14000 }
+  ]
+}
