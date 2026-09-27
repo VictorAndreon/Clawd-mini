@@ -52,6 +52,18 @@ function start(): void {
     persist(prefs);
   });
 
+  // Monitor conectado/desconectado com o app aberto: volta para a posição salva se ela
+  // estiver visível, senão para o canto da tela principal (não sobrescreve o prefs).
+  const reposition = (): void => {
+    if (win.isDestroyed()) return;
+    const p = resolvePosition(prefs, workAreas(), screen.getPrimaryDisplay().workArea);
+    const [x, y] = win.getPosition();
+    if (p.x !== x || p.y !== y) win.setPosition(p.x, p.y);
+  };
+  screen.on('display-removed', reposition);
+  screen.on('display-added', reposition);
+  screen.on('display-metrics-changed', reposition);
+
   let records: SessionRecord[] = [];
   let shown = '';
   const render = (): void => {
@@ -74,7 +86,7 @@ function start(): void {
     isDnd: () => dnd,
     setDnd: (on) => {
       dnd = on;
-      presenter.setDnd(on);
+      presenter.setDnd(on, Date.now());
       render();
     },
     resetPosition: () => {

@@ -88,9 +88,18 @@ test('evento que chega como idle (SessionStart) também acorda', () => {
 
 test('não perturbe congela em sleeping; ao desligar, acorda se houve evento', () => {
   const p = new Presenter(theme(), T0);
-  p.setDnd(true);
+  p.setDnd(true, T0);
   assert.equal(p.tick(agg('attention', T0 + 10), T0 + 10), 'sleeping.svg');
-  p.setDnd(false);
+  p.setDnd(false, T0 + 20);
   assert.equal(p.tick(agg('attention', T0 + 10), T0 + 20), 'waking.svg');
   assert.equal(p.tick(agg('attention', T0 + 10), T0 + 20 + SLEEP.wakeMs), 'attention.svg');
+});
+
+test('desligar não perturbe sem evento novo também toca waking', () => {
+  const p = new Presenter(theme([]), T0);
+  p.setDnd(true, T0);
+  p.tick(agg('idle', T0), T0 + 10);
+  p.setDnd(false, T0 + 20);
+  assert.equal(p.tick(agg('idle', T0), T0 + 20), 'waking.svg');
+  assert.equal(p.tick(agg('idle', T0), T0 + 20 + SLEEP.wakeMs), 'idle.svg');
 });

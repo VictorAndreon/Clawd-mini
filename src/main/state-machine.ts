@@ -11,6 +11,8 @@ export const TIMING = {
   errorMs: 5_000,
   staleMs: 10 * 60_000,
   workingStuckMs: 5 * 60_000,
+  thinkingStuckMs: 5 * 60_000, // interrupção (Esc) não gera evento de hook
+  clockSkewMs: 5_000,
   deleteAfterMs: 24 * 60 * 60_000,
 } as const;
 
@@ -42,7 +44,10 @@ export function effectiveState(r: SessionRecord, now: number): State {
   const age = now - r.updatedAt;
   switch (r.state) {
     case 'done': return age < TIMING.doneMs ? 'done' : 'idle';
-    case 'error': return age < TIMING.errorMs ? 'error' : 'thinking';
+    case 'error':
+      if (age < TIMING.errorMs) return 'error';
+      return r.event === 'StopFailure' ? 'idle' : 'thinking';
+    case 'thinking': return age < TIMING.thinkingStuckMs ? 'thinking' : 'idle';
     case 'working': return age < TIMING.workingStuckMs ? 'working' : 'idle';
     default: return r.state;
   }
@@ -67,6 +72,7 @@ export function aggregate(records: SessionRecord[], now: number): Aggregate {
     // attention não envelhece: o Claude continua parado esperando você (spec: loop até a
     // sessão mudar). Sessão morta em attention some na limpeza de 24 h ou no SessionEnd.
     if (rec.state !== 'attention' && now - rec.updatedAt > TIMING.staleMs) continue;
+    if (rec.updatedAt - now > TIMING.clockSkewMs) continue; // relógio voltou: registro inconfiável
     const s = effectiveState(rec, now);
     if (s !== 'idle') active++;
     const better = !best

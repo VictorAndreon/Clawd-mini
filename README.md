@@ -35,6 +35,9 @@ npm run build
 npm run install-autostart
 ```
 
+O `.desktop` usa o caminho absoluto do `node` atual. Se você trocar de versão no nvm e remover
+a antiga, o autostart falha em silêncio: rode `npm run install-autostart` de novo.
+
 ## Desenvolvimento
 
 ```bash

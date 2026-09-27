@@ -39,7 +39,8 @@ export class Presenter {
     this.idleSince = startedAt;
   }
 
-  setDnd(on: boolean): void {
+  setDnd(on: boolean, now: number): void {
+    if (this.dnd && !on) this.wakeUntil = now + SLEEP.wakeMs;
     this.dnd = on;
   }
 

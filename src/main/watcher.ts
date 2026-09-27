@@ -27,7 +27,7 @@ export function readSessions(dir: string, now: number): SessionRecord[] {
   const out: SessionRecord[] = [];
   for (const name of names) {
     const isJson = name.endsWith('.json');
-    if (!isJson && !name.endsWith('.tmp')) continue;
+    if (!isJson && !name.endsWith('.tmp') && !name.endsWith('.lock')) continue;
     const file = path.join(dir, name);
     let raw = '';
     let mtime: number;

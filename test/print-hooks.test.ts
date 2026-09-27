@@ -17,7 +17,8 @@ const ph: PrintHooks = require(path.join(ROOT, 'scripts', 'print-hooks.js'));
 test('um bloco por evento, async, timeout 3, matcher vazio', () => {
   const out = ph.buildHooks('/usr/bin/node', '/repo/hook/hook.js');
   assert.deepEqual(Object.keys(out.hooks), ph.EVENTS);
-  assert.equal(ph.EVENTS.length, 12);
+  assert.equal(ph.EVENTS.length, 13);
+  assert.ok(ph.EVENTS.includes('StopFailure'));
   for (const ev of ph.EVENTS) {
     const [block] = out.hooks[ev];
     assert.equal(block.matcher, '');

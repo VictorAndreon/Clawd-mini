@@ -179,3 +179,47 @@ test('hook.js só usa sintaxe/APIs de Node 12', () => {
     assert.equal(re.test(src), false, what);
   }
 });
+
+test('StopFailure (turno encerrado por erro de API) vira error e zera subagentes', () => {
+  const r = hook.computeNext({ state: 'juggling', subagents: 2, prevState: 'working', updatedAt: 0 }, 'StopFailure', base, 1)!;
+  assert.deepEqual([r.state, r.subagents, 'prevState' in r], ['error', 0, false]);
+});
+
+test('relógio que voltou mais de 5 s: aceita o evento em vez de travar a sessão', () => {
+  assert.equal(hook.computeNext({ state: 'done', updatedAt: 20_000 }, 'UserPromptSubmit', base, 18_000), null);
+  const r = hook.computeNext({ state: 'done', updatedAt: 20_000 }, 'UserPromptSubmit', base, 14_000)!;
+  assert.equal(r.state, 'thinking');
+});
+
+test('updatedAt é o nascimento do processo, não o fim do boot do node', () => {
+  const home = tmpHome();
+  const t0 = Date.now();
+  runHook(home, 'Stop', JSON.stringify(base));
+  const rec = JSON.parse(fs.readFileSync(recPath(home, ID), 'utf8'));
+  assert.ok(rec.updatedAt - t0 < 10, `updatedAt ${rec.updatedAt - t0} ms depois do spawn`);
+});
+
+test('SubagentStart concorrentes não perdem contagem', async () => {
+  const home = tmpHome();
+  runHook(home, 'UserPromptSubmit', JSON.stringify(base));
+  const N = 6;
+  await Promise.all(Array.from({ length: N }, () => new Promise<void>((resolve) => {
+    const child = spawn(process.execPath, [HOOK, 'SubagentStart'], {
+      env: { ...process.env, CLAWD_MINI_HOME: home },
+      stdio: ['pipe', 'ignore', 'ignore'],
+    });
+    child.on('exit', () => resolve());
+    child.stdin.end(JSON.stringify(base));
+  })));
+  const rec = JSON.parse(fs.readFileSync(recPath(home, ID), 'utf8'));
+  assert.equal(rec.subagents, N);
+  assert.deepEqual(fs.readdirSync(path.join(home, 'sessions')), [ID + '.json']);
+});
+
+test('Subagent* atrasado ainda conta, sem recuar updatedAt', () => {
+  const prev = { state: 'juggling', subagents: 1, prevState: 'working', updatedAt: 2000 };
+  const r = hook.computeNext(prev, 'SubagentStart', base, 1500)!;
+  assert.deepEqual([r.state, r.subagents, r.updatedAt], ['juggling', 2, 2000]);
+  const s = hook.computeNext({ ...prev, subagents: 2 }, 'SubagentStop', base, 1500)!;
+  assert.deepEqual([s.state, s.subagents, s.updatedAt], ['juggling', 1, 2000]);
+});

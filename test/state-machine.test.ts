@@ -33,10 +33,24 @@ test('one-shots e working preso expiram pelo relógio', () => {
   assert.equal(effectiveState(r({ state: 'sweeping', updatedAt: NOW - 500_000 }), NOW), 'sweeping');
 });
 
+test('thinking preso (interrupção sem Stop) cai para idle em 5 min', () => {
+  assert.equal(effectiveState(r({ state: 'thinking', updatedAt: NOW - 299_999 }), NOW), 'thinking');
+  assert.equal(effectiveState(r({ state: 'thinking', updatedAt: NOW - 300_000 }), NOW), 'idle');
+});
+
+test('error de StopFailure termina em idle, não em thinking', () => {
+  assert.equal(effectiveState(r({ state: 'error', event: 'StopFailure', updatedAt: NOW - 5_000 }), NOW), 'idle');
+});
+
+test('registro no futuro além da tolerância (relógio voltou) é ignorado', () => {
+  assert.equal(aggregate([r({ state: 'done', updatedAt: NOW + 10_000 })], NOW).state, 'idle');
+  assert.equal(aggregate([r({ state: 'done', updatedAt: NOW + 2_000 })], NOW).state, 'done');
+});
+
 test('sessão velha sai do cálculo mas conta em lastEventAt', () => {
-  const a = aggregate([r({ state: 'thinking', updatedAt: NOW - 600_001 })], NOW);
+  const a = aggregate([r({ state: 'sweeping', updatedAt: NOW - 600_001 })], NOW);
   assert.deepEqual(a, { state: 'idle', key: 'idle', lastEventAt: NOW - 600_001, active: 0 });
-  assert.equal(aggregate([r({ state: 'thinking', updatedAt: NOW - 600_000 })], NOW).state, 'thinking');
+  assert.equal(aggregate([r({ state: 'sweeping', updatedAt: NOW - 600_000 })], NOW).state, 'sweeping');
 });
 
 test('attention não fica velha: o Claude continua esperando você', () => {
