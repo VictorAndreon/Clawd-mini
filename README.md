@@ -38,6 +38,30 @@ instalado, o postinstall dele não rodou. Rode na mão:
 node node_modules/electron/install.js
 ```
 
+**Ubuntu 24.04 ou mais novo:** o AppArmor bloqueia o sandbox do Electron e o app fecha logo ao
+abrir, com `The SUID sandbox helper binary was found, but is not configured correctly`. Confira
+com `cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns`: se der `1`, crie um perfil que
+libera só o Electron deste repo. Rode na raiz do repo, porque o `$PWD` vira o caminho do binário:
+
+```bash
+sudo tee /etc/apparmor.d/clawd-mini-electron >/dev/null <<EOF
+abi <abi/4.0>,
+include <tunables/global>
+
+profile clawd-mini-electron $PWD/node_modules/electron/dist/electron flags=(unconfined) {
+  userns,
+  include if exists <local/clawd-mini-electron>
+}
+EOF
+```
+
+```bash
+sudo apparmor_parser -r /etc/apparmor.d/clawd-mini-electron
+```
+
+Isso é feito uma vez só e continua valendo depois de `npm install`. Se você mover o repo de
+pasta, gere o perfil de novo. Não use `--no-sandbox`: ele desliga o sandbox do Chromium.
+
 ### 2. Abrir o pet
 
 ```bash
@@ -120,7 +144,8 @@ Se o caminho do repo ou do node mudou, refaça o passo 3 (hooks) e o passo 5 (au
 1. Apague as entradas do clawd-mini em `~/.claude/settings.json` (as que apontam para `hook/hook.js`).
 2. `npm run uninstall-autostart`
 3. `rm -rf ~/.clawd-mini`
-4. Apague a pasta do repo.
+4. Se criou o perfil do AppArmor: `sudo apparmor_parser -R /etc/apparmor.d/clawd-mini-electron && sudo rm /etc/apparmor.d/clawd-mini-electron`
+5. Apague a pasta do repo.
 
 ## Desenvolvimento
 
@@ -140,6 +165,10 @@ Os SVGs já estão em `themes/clawd/`. Para reimportar de um clone do clawd-on-d
   de colá-los. Confira o passo 3 e abra uma sessão nova. `ls ~/.clawd-mini/sessions/` deve ganhar
   arquivos quando você manda um prompt.
 - **`dist/ não existe`:** rode `npm run build` (ou `npm start`, que já compila).
+- **Não abre no login, mas abre pelo terminal do Claude Desktop:** quase sempre é o AppArmor do
+  Ubuntu 24.04+ (veja o passo 1). Procure o erro com `journalctl --user -b | grep clawd`.
+- **`MESA-LOADER ... dri_gbm.so: Permissão negada` e `atom_cache` no log:** barulho do Chromium.
+  O pet funciona normalmente.
 - **Fundo preto em vez de transparente:** crie a janela com atraso, `setTimeout(start, 300)` em `src/main/main.ts`. Não foi preciso no GNOME/X11.
 - **Sem ícone na barra:** no GNOME o tray exige a extensão AppIndicator. O pet funciona sem ela.
 - **Xorg e Wayland:** funciona nos dois. O launcher força XWayland (`--ozone-platform=x11`) quando há `$DISPLAY`; em Xorg isso não muda nada. Em Wayland sem XWayland o pet abre, mas não consegue se posicionar nem ficar por cima, e avisa no log e no tooltip do tray.
