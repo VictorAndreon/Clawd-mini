@@ -64,7 +64,9 @@ export function aggregate(records: SessionRecord[], now: number): Aggregate {
   let active = 0;
   for (const rec of records) {
     lastEventAt = Math.max(lastEventAt, rec.updatedAt);
-    if (now - rec.updatedAt > TIMING.staleMs) continue;
+    // attention não envelhece: o Claude continua parado esperando você (spec: loop até a
+    // sessão mudar). Sessão morta em attention some na limpeza de 24 h ou no SessionEnd.
+    if (rec.state !== 'attention' && now - rec.updatedAt > TIMING.staleMs) continue;
     const s = effectiveState(rec, now);
     if (s !== 'idle') active++;
     const better = !best

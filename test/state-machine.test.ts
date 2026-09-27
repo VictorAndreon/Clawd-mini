@@ -34,9 +34,15 @@ test('one-shots e working preso expiram pelo relógio', () => {
 });
 
 test('sessão velha sai do cálculo mas conta em lastEventAt', () => {
-  const a = aggregate([r({ state: 'attention', updatedAt: NOW - 600_001 })], NOW);
+  const a = aggregate([r({ state: 'thinking', updatedAt: NOW - 600_001 })], NOW);
   assert.deepEqual(a, { state: 'idle', key: 'idle', lastEventAt: NOW - 600_001, active: 0 });
-  assert.equal(aggregate([r({ state: 'attention', updatedAt: NOW - 600_000 })], NOW).state, 'attention');
+  assert.equal(aggregate([r({ state: 'thinking', updatedAt: NOW - 600_000 })], NOW).state, 'thinking');
+});
+
+test('attention não fica velha: o Claude continua esperando você', () => {
+  const a = aggregate([r({ state: 'attention', updatedAt: NOW - 3 * 60 * 60_000 })], NOW);
+  assert.equal(a.state, 'attention');
+  assert.equal(a.active, 1);
 });
 
 test('variantes de working e juggling', () => {
