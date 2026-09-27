@@ -5,4 +5,7 @@ contextBridge.exposeInMainWorld('clawd', {
     ipcRenderer.on('sprite', (_e, file: string) => cb(file));
   },
   themeInfo: (): Promise<{ files: string[]; drag: string }> => ipcRenderer.invoke('theme:info'),
+  dragStart: (): void => ipcRenderer.send('drag:start'),
+  dragMove: (): void => ipcRenderer.send('drag:move'),
+  dragEnd: (): void => ipcRenderer.send('drag:end'),
 });

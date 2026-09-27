@@ -5,14 +5,27 @@ import { watchSessions } from './watcher';
 import { aggregate, SessionRecord } from './state-machine';
 import { Presenter } from './presenter';
 import { loadTheme, themeFiles, Theme } from './theme';
-import { APP_ROOT, SESSIONS_DIR } from './paths';
+import { loadPrefs, Prefs, Rect, resolvePosition, savePrefs } from './prefs';
+import { installDrag } from './drag';
+import { APP_ROOT, PREFS_FILE, SESSIONS_DIR } from './paths';
 import { degradedDisplayWarning } from './platform';
 
 const TICK_MS = 250;
-const SIZE = 160;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else void app.whenReady().then(start);
+
+function workAreas(): Rect[] {
+  return screen.getAllDisplays().map((d) => d.workArea);
+}
+
+function persist(prefs: Prefs): void {
+  try {
+    savePrefs(PREFS_FILE, prefs);
+  } catch (err) {
+    console.warn('clawd-mini: não consegui salvar prefs', err);
+  }
+}
 
 function start(): void {
   const warning = degradedDisplayWarning();
@@ -26,10 +39,16 @@ function start(): void {
     return;
   }
 
-  const wa = screen.getPrimaryDisplay().workArea;
-  const win = createPetWindow({ x: wa.x + wa.width - SIZE - 16, y: wa.y + wa.height - SIZE - 16, size: SIZE });
+  let prefs = loadPrefs(PREFS_FILE);
+  const pos = resolvePosition(prefs, workAreas(), screen.getPrimaryDisplay().workArea);
+  const win = createPetWindow({ ...pos, size: prefs.size });
   const presenter = new Presenter(theme, Date.now());
+
   ipcMain.handle('theme:info', () => ({ files: themeFiles(theme), drag: theme.states.drag }));
+  installDrag(win, (x, y) => {
+    prefs = { ...prefs, x, y };
+    persist(prefs);
+  });
 
   let records: SessionRecord[] = [];
   let shown = '';
