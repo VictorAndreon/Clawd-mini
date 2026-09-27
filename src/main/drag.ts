@@ -42,9 +42,10 @@ export function createDragController(d: DragDeps): DragController {
     },
     end() {
       if (!start) return;
+      const s = start;
       start = null;
       const [x, y] = d.getWindowPos();
-      d.onDrop(x, y);
+      if (x !== s.wx || y !== s.wy) d.onDrop(x, y); // clique sem arrastar não regrava prefs
     },
   };
 }

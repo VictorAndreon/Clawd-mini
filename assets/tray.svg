@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.6 3.6 11.8 11.8" shape-rendering="crispEdges">
+  <!-- Ícone do tray: corpo e olhos > < de clawd-react-drag.svg (arte de rullerzhou-afk, ver themes/clawd/NOTICE.md) -->
+  <rect x="2" y="6" width="11" height="7" fill="#DE886D"/>
+  <g fill="none" stroke="#000000" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision">
+    <polyline points="4,8 5.5,9.5 4,11"/>
+    <polyline points="11,8 9.5,9.5 11,11"/>
+  </g>
+</svg>

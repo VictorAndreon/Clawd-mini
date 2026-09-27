@@ -60,4 +60,5 @@ function endDrag(): void {
 }
 pet.addEventListener('pointerup', endDrag);
 pet.addEventListener('pointercancel', endDrag);
+pet.addEventListener('lostpointercapture', endDrag);
 pet.addEventListener('contextmenu', (e) => e.preventDefault()); // clique-direito desligado na v1

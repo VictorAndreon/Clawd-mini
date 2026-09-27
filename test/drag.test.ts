@@ -42,3 +42,11 @@ test('move e end sem start não fazem nada', () => {
   assert.deepEqual(state.win, [100, 200]);
   assert.deepEqual(state.drops, []);
 });
+
+test('clique sem arrastar não grava posição', () => {
+  const { state, ctl } = fakeDesktop();
+  ctl.start();
+  ctl.move();
+  ctl.end();
+  assert.deepEqual(state.drops, []);
+});
