@@ -23,6 +23,7 @@
 - Prioridade: `error 7 > attention 6 > sweeping 5 > done 4 > juggling 3 > working 2 > thinking 1 > idle 0`.
 - Tempos: `done` 4 s, `error` 5 s, `attention` mínimo 5 s, `sweeping` até o próximo evento, `staleMs` 10 min, apagar após 24 h, `working` preso 5 min, variação de idle após 20 s, bocejo aos 60 s (3 s), colapso aos 10 min, `waking` 1,5 s.
 - Sprites: arte de rullerzhou-afk, **uso não comercial**, NOTICE obrigatório. Nunca copiar código do clawd-on-desk.
+- Tem que funcionar igual em sessão Xorg e Wayland (via XWayland). Wayland sem XWayland: abre, avisa no log e no tooltip do tray, sem abortar.
 - Hooks registrados com caminho **absoluto** do node, `"async": true`, `"timeout": 3`.
 
 ### Desvios conscientes da spec (confirmados com o usuário na revisão do plano)
@@ -53,6 +54,7 @@
 | `scripts/start.js` | Launcher do Electron (guarda do `$DISPLAY`, limpa env). |
 | `scripts/install-autostart.js` | Cria/remove `~/.config/autostart/clawd-mini.desktop`. |
 | `scripts/import-clawd-assets.sh` | Copia só os SVGs do `theme.json`. |
+| `src/main/platform.ts` | Detecta Wayland sem XWayland (modo degradado) e monta o aviso. |
 | `src/main/paths.ts` | Caminhos (`~/.clawd-mini`, raiz do app). `CLAWD_MINI_HOME` sobrescreve. |
 | `src/main/state-machine.ts` | Tipos, prioridades, tempos, `effectiveState`, `aggregate` (puro). |
 | `src/main/watcher.ts` | `readSessions` (parse, limpeza 24 h) e `watchSessions` (watch + debounce + varredura). |
@@ -1133,13 +1135,14 @@ git commit -m "feat: watcher do diretório de sessões com varredura e limpeza"
 Entrega da **Fase 1** da spec: hook + watcher + janela mostrando o nome do estado.
 
 **Files:**
-- Create: `src/main/paths.ts`, `src/main/window.ts`, `src/main/main.ts`, `src/preload.ts`, `src/renderer/index.html`, `src/renderer/renderer.ts`, `src/renderer/style.css`, `scripts/start.js`, `test/start.test.ts`
+- Create: `src/main/paths.ts`, `src/main/platform.ts`, `src/main/window.ts`, `src/main/main.ts`, `src/preload.ts`, `src/renderer/index.html`, `src/renderer/renderer.ts`, `src/renderer/style.css`, `scripts/start.js`, `test/start.test.ts`, `test/platform.test.ts`
 
 **Interfaces:**
 - Consumes: `watchSessions` (Task 4), `aggregate`, `SessionRecord` (Task 3).
 - Produces:
   - `paths.ts`: `APP_ROOT: string`, `clawdHome(env?): string`, `SESSIONS_DIR: string`, `PREFS_FILE: string`.
   - `window.ts`: `createPetWindow(bounds: { x: number; y: number; size: number }): BrowserWindow`.
+  - `platform.ts`: `degradedDisplayWarning(env?: NodeJS.ProcessEnv): string | null` — mensagem quando a sessão é Wayland sem `$DISPLAY`, senão `null`.
   - `scripts/start.js`: exporta `buildLaunch(env: NodeJS.ProcessEnv, root: string): { args: string[]; env: NodeJS.ProcessEnv }`.
   - IPC `state` (main → renderer, payload `string`). Substituído por `sprite` na Task 8.
 
@@ -1234,6 +1237,53 @@ export function clawdHome(env: NodeJS.ProcessEnv = process.env): string {
 export const SESSIONS_DIR = path.join(clawdHome(), 'sessions');
 export const PREFS_FILE = path.join(clawdHome(), 'prefs.json');
 ```
+
+- [ ] **Step 4b: Aviso de modo degradado (`src/main/platform.ts`)**
+
+`test/platform.test.ts`:
+
+```ts
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { degradedDisplayWarning } from '../src/main/platform';
+
+test('Xorg e Wayland com XWayland: sem aviso', () => {
+  assert.equal(degradedDisplayWarning({ XDG_SESSION_TYPE: 'x11', DISPLAY: ':1' }), null);
+  assert.equal(degradedDisplayWarning({ XDG_SESSION_TYPE: 'wayland', DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0' }), null);
+});
+
+test('Wayland sem XWayland: avisa', () => {
+  const w = degradedDisplayWarning({ XDG_SESSION_TYPE: 'wayland', DISPLAY: '', WAYLAND_DISPLAY: 'wayland-0' });
+  assert.match(w ?? '', /XWayland/);
+});
+
+test('WAYLAND_DISPLAY sem DISPLAY também conta, mesmo sem XDG_SESSION_TYPE', () => {
+  assert.notEqual(degradedDisplayWarning({ WAYLAND_DISPLAY: 'wayland-0' }), null);
+});
+
+test('sem nada (tty, ssh): sem aviso', () => {
+  assert.equal(degradedDisplayWarning({}), null);
+});
+```
+
+Run: `npm test`
+Expected: FAIL — `Cannot find module '../src/main/platform'`.
+
+`src/main/platform.ts`:
+
+```ts
+// O launcher só força XWayland quando há $DISPLAY. Sem ele numa sessão Wayland, o app
+// roda como cliente Wayland nativo e o compositor ignora setPosition/alwaysOnTop.
+export function degradedDisplayWarning(env: NodeJS.ProcessEnv = process.env): string | null {
+  const wayland = env.XDG_SESSION_TYPE === 'wayland' || !!env.WAYLAND_DISPLAY;
+  if (!wayland || env.DISPLAY) return null;
+  return 'clawd-mini: sessão Wayland sem XWayland. Posição salva, arrastar e "sempre por cima" '
+    + 'não funcionam. Instale/ative o XWayland para o pet funcionar direito.';
+}
+```
+
+Run: `npm test`
+Expected: PASS.
 
 - [ ] **Step 5: `src/main/window.ts`**
 
@@ -1353,6 +1403,7 @@ import { createPetWindow } from './window';
 import { watchSessions } from './watcher';
 import { aggregate, SessionRecord } from './state-machine';
 import { SESSIONS_DIR } from './paths';
+import { degradedDisplayWarning } from './platform';
 
 const TICK_MS = 250;
 const SIZE = 160;
@@ -1361,6 +1412,8 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else void app.whenReady().then(start);
 
 function start(): void {
+  const warning = degradedDisplayWarning();
+  if (warning) console.warn(warning);
   const wa = screen.getPrimaryDisplay().workArea;
   const win = createPetWindow({ x: wa.x + wa.width - SIZE - 16, y: wa.y + wa.height - SIZE - 16, size: SIZE });
 
@@ -2039,6 +2092,7 @@ import { aggregate, SessionRecord } from './state-machine';
 import { Presenter } from './presenter';
 import { loadTheme, themeFiles, Theme } from './theme';
 import { APP_ROOT, SESSIONS_DIR } from './paths';
+import { degradedDisplayWarning } from './platform';
 
 const TICK_MS = 250;
 const SIZE = 160;
@@ -2047,6 +2101,8 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else void app.whenReady().then(start);
 
 function start(): void {
+  const warning = degradedDisplayWarning();
+  if (warning) console.warn(warning);
   let theme: Theme;
   try {
     theme = loadTheme(path.join(APP_ROOT, 'themes', 'clawd'));
@@ -2405,6 +2461,7 @@ import { loadTheme, themeFiles, Theme } from './theme';
 import { loadPrefs, Prefs, Rect, resolvePosition, savePrefs } from './prefs';
 import { installDrag } from './drag';
 import { APP_ROOT, PREFS_FILE, SESSIONS_DIR } from './paths';
+import { degradedDisplayWarning } from './platform';
 
 const TICK_MS = 250;
 
@@ -2424,6 +2481,8 @@ function persist(prefs: Prefs): void {
 }
 
 function start(): void {
+  const warning = degradedDisplayWarning();
+  if (warning) console.warn(warning);
   let theme: Theme;
   try {
     theme = loadTheme(path.join(APP_ROOT, 'themes', 'clawd'));
@@ -2493,7 +2552,8 @@ git commit -m "feat: arrastar o pet com sprite drag e posição salva"
 
 **Interfaces:**
 - Consumes: `Presenter.setDnd` (Task 7), `resolvePosition`, `savePrefs` (Task 9).
-- Produces: `interface TrayActions { isVisible(): boolean; toggleVisible(): void; isDnd(): boolean; setDnd(on: boolean): void; resetPosition(): void; quit(): void }`, `createTray(iconPath: string, a: TrayActions): Tray | null`.
+- Produces: `interface TrayActions { isVisible(): boolean; toggleVisible(): void; isDnd(): boolean; setDnd(on: boolean): void; resetPosition(): void; quit(): void }`, `createTray(iconPath: string, a: TrayActions, tooltip?: string): Tray | null`.
+- Consumes também: `degradedDisplayWarning` (Task 5) — já chamado em `start()` como `warning`.
 
 - [ ] **Step 1: Ícone do tray**
 
@@ -2539,7 +2599,7 @@ export interface TrayActions {
 }
 
 // No GNOME o tray depende da extensão AppIndicator. Sem ela, o app segue sem tray.
-export function createTray(iconPath: string, a: TrayActions): Tray | null {
+export function createTray(iconPath: string, a: TrayActions, tooltip = 'clawd-mini'): Tray | null {
   let tray: Tray;
   try {
     tray = new Tray(nativeImage.createFromPath(iconPath));
@@ -2547,7 +2607,7 @@ export function createTray(iconPath: string, a: TrayActions): Tray | null {
     console.warn('clawd-mini: tray indisponível', err);
     return null;
   }
-  tray.setToolTip('clawd-mini');
+  tray.setToolTip(tooltip);
   const rebuild = (): void => {
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: a.isVisible() ? 'Esconder' : 'Mostrar', click: () => { a.toggleVisible(); rebuild(); } },
@@ -2633,7 +2693,7 @@ por:
       win.setPosition(p.x, p.y);
     },
     quit: () => app.quit(),
-  });
+  }, warning ?? 'clawd-mini');
 }
 ```
 
@@ -2848,7 +2908,8 @@ npm test                  # testes (node:test)
 
 - **Fundo preto em vez de transparente:** a criação da janela precisa de atraso (`setTimeout(start, 300)` em `src/main/main.ts`).
 - **Sem ícone na barra:** no GNOME o tray exige a extensão AppIndicator. O pet funciona sem ela.
-- **Wayland:** o launcher força XWayland (`--ozone-platform=x11`) quando há `$DISPLAY`. Em Wayland sem XWayland o pet não consegue se posicionar nem ficar por cima.
+- **Xorg e Wayland:** funciona nos dois. O launcher força XWayland (`--ozone-platform=x11`) quando há `$DISPLAY`; em Xorg isso não muda nada. Em Wayland sem XWayland o pet abre, mas não consegue se posicionar nem ficar por cima, e avisa no log e no tooltip do tray.
+- **Escala fracionária no XWayland (125%, 150%):** pode deixar o sprite borrado ou o arraste levemente deslocado.
 
 ## Licença dos sprites
 
@@ -2871,6 +2932,8 @@ Com `npm start` e os hooks registrados, marque cada item e anote o resultado rea
 - [ ] Com o app fechado, o Claude funciona normal e o hook não gera erro visível.
 - [ ] Arrastar, fechar e reabrir → mesma posição.
 - [ ] Funciona com sessão do Claude Desktop (aba Code) e com o CLI.
+- [ ] **Sessão Wayland** (via XWayland): **peça ao usuário** para sair, escolher "Ubuntu" (não "Ubuntu on Xorg") na engrenagem da tela de login, entrar e rodar `npm start`. Conferir: `echo $XDG_SESSION_TYPE` = `wayland`, arrastar funciona, posição salva é restaurada, pet fica por cima de uma janela maximizada, nenhum aviso de modo degradado no log. Depois, voltar para a sessão de costume.
+- [ ] **Modo degradado** (simulado, sem trocar de sessão): `DISPLAY= XDG_SESSION_TYPE=wayland node scripts/start.js` → o app abre sem abortar (ou falha só por não ter compositor Wayland acessível) e o log mostra o aviso de XWayland. Se abrir, o tooltip do tray mostra o aviso.
 - [ ] Hook com stdin vazio ou JSON inválido → sai com 0, sem escrever (coberto por teste + simulate).
 - [ ] Tempo do hook < 100 ms (coluna de ms do `simulate.sh`; anote a mediana real).
 

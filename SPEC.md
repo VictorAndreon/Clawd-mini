@@ -154,9 +154,11 @@ Opções do `BrowserWindow`:
 - **Arrastar:** manual, via `mousedown`/`mousemove` → IPC → `win.setPosition`, mostrando o sprite `drag` (detalhes na seção 5). Clique-duplo e clique-direito ficam desligados na v1.
 - **Posição:** salva em `~/.clawd-mini/prefs.json` ao soltar o arraste e restaurada ao abrir. Se a posição salva cair fora de qualquer tela (monitor desconectado), volta para o canto inferior direito da tela principal.
 
-### Wayland → XWayland (obrigatório no Ubuntu desta máquina)
+### X11 e Wayland → XWayland
 
-O Electron ≥ 38 roda como cliente Wayland nativo por padrão. No Wayland o app não pode posicionar a própria janela nem forçar "sempre por cima", e isso quebra o pet.
+O app tem que funcionar igual em sessão **Xorg** e em sessão **Wayland** (padrão do Ubuntu). Em Xorg a flag abaixo não muda nada; em Wayland ela é necessária.
+
+O Electron ≥ 38 roda como cliente Wayland nativo por padrão numa sessão Wayland. No Wayland o app não pode posicionar a própria janela nem forçar "sempre por cima", e isso quebra o pet.
 
 - **O backend não pode ser trocado em runtime.** O Electron escolhe o backend Ozone em C++ antes do script main rodar. `app.commandLine.appendSwitch` no main é tarde demais. Isso foi confirmado no código do clawd-on-desk (`src/main.js`, `src/linux-ozone.js`).
 - **Solução:** o launcher passa a flag direto:
@@ -165,6 +167,8 @@ O Electron ≥ 38 roda como cliente Wayland nativo por padrão. No Wayland o app
   ```
   Ela vai no `npm start` e no `.desktop` de autostart.
 - **Guarda:** se `$DISPLAY` estiver vazio (Wayland sem XWayland), o launcher não passa a flag. Com `x11` e sem X server, o Chromium aborta antes do `ready`.
+- **Modo degradado avisado:** se o main detectar `XDG_SESSION_TYPE=wayland` sem `$DISPLAY`, escreve um aviso no log e no tooltip do tray explicando que posição e "sempre por cima" não vão funcionar.
+- **Verificação:** o checklist (seção 7) roda nos dois tipos de sessão.
 - **Limitação aceita:** não há rastreio do cursor fora da própria janela, então não dá para o pet seguir o mouse com os olhos. Fica para uma v2 opcional, só em sessão Xorg.
 
 ### Watcher
@@ -389,6 +393,7 @@ O script faz o `echo` de payloads JSON falsos para o `hook.js`, percorrendo todo
 - [ ] Matar o Claude sem `SessionEnd` → a sessão some do cálculo em 10 min.
 - [ ] Com o app fechado, o Claude funciona normal e o hook não gera erro visível.
 - [ ] Arrastar, fechar e reabrir → mesma posição.
+- [ ] Funciona em sessão Xorg e em sessão Wayland (via XWayland): arrastar, posição salva, sempre por cima.
 - [ ] Funciona com sessão do **Claude Desktop** (aba Code) e com o **CLI** no terminal.
 - [ ] Hook com stdin vazio ou JSON inválido → sai com código 0, sem escrever nada.
 - [ ] Tempo do hook medido: meta < 100 ms (`time` no simulate).
