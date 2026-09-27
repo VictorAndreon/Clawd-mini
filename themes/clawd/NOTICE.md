@@ -7,3 +7,5 @@
 
 Estes SVGs não são cobertos por nenhuma licença deste repositório. Se o repositório
 ficar público, eles só podem ir junto com este NOTICE, e nunca num produto comercial.
+
+`assets/tray.png` é derivado de `clawd-idle-follow.svg` e segue as mesmas condições.

@@ -7,10 +7,12 @@ import { Presenter } from './presenter';
 import { loadTheme, themeFiles, Theme } from './theme';
 import { loadPrefs, Prefs, Rect, resolvePosition, savePrefs } from './prefs';
 import { installDrag } from './drag';
+import { createTray, TrayHandle } from './tray';
 import { APP_ROOT, PREFS_FILE, SESSIONS_DIR } from './paths';
 import { degradedDisplayWarning } from './platform';
 
 const TICK_MS = 250;
+let tray: TrayHandle | null = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else void app.whenReady().then(start);
@@ -64,4 +66,26 @@ function start(): void {
   win.webContents.on('did-finish-load', () => { shown = ''; render(); });
   watchSessions(SESSIONS_DIR, (r) => { records = r; render(); });
   setInterval(render, TICK_MS);
+
+  let dnd = false;
+  tray = createTray(path.join(APP_ROOT, 'assets', 'tray.png'), {
+    isVisible: () => win.isVisible(),
+    toggleVisible: () => (win.isVisible() ? win.hide() : win.showInactive()),
+    isDnd: () => dnd,
+    setDnd: (on) => {
+      dnd = on;
+      presenter.setDnd(on);
+      render();
+    },
+    resetPosition: () => {
+      prefs = { size: prefs.size };
+      persist(prefs);
+      const p = resolvePosition(prefs, workAreas(), screen.getPrimaryDisplay().workArea);
+      win.setPosition(p.x, p.y);
+    },
+    quit: () => app.quit(),
+  }, warning ?? 'clawd-mini');
+  // O menu é montado antes do ready-to-show; o rótulo Esconder/Mostrar precisa acompanhar.
+  win.on('show', () => tray?.refresh());
+  win.on('hide', () => tray?.refresh());
 }
