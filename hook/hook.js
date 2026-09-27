@@ -8,6 +8,9 @@ var os = require('os');
 var path = require('path');
 
 var STDIN_TIMEOUT_MS = 1000;
+var CLOCK_SKEW_MS = 5000; // registro mais no futuro que isso = relógio voltou; aceita o evento
+var LOCK_WAIT_MS = 250;
+var LOCK_STALE_MS = 2000;
 var SESSION_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 var EVENT_STATE = {
@@ -16,6 +19,7 @@ var EVENT_STATE = {
   PreToolUse: 'working',
   PostToolUse: 'thinking',
   PostToolUseFailure: 'error',
+  StopFailure: 'error',
   PreCompact: 'sweeping',
   PostCompact: 'idle',
   Notification: 'attention',
@@ -31,7 +35,7 @@ var ATTENTION_TYPES = {
   agent_needs_input: true
 };
 
-var RESET_SUBAGENTS = { SessionStart: true, UserPromptSubmit: true, Stop: true };
+var RESET_SUBAGENTS = { SessionStart: true, UserPromptSubmit: true, Stop: true, StopFailure: true };
 var TOOL_EVENTS = { PreToolUse: true, PostToolUse: true };
 var BUSY = { thinking: true, working: true };
 
@@ -45,7 +49,13 @@ function baseDir() {
 
 // Função pura: registro anterior + evento -> novo registro, ou null (não gravar).
 function computeNext(prev, event, input, now) {
-  if (prev && typeof prev.updatedAt === 'number' && prev.updatedAt > now) return null;
+  // Hooks async podem terminar fora de ordem: evento mais velho que o gravado é descartado,
+  // a menos que a diferença seja grande demais para ser corrida (relógio voltou).
+  // Subagent* mexe num contador, não no estado: evento atrasado ainda conta.
+  var late = !!prev && typeof prev.updatedAt === 'number' && prev.updatedAt > now &&
+    prev.updatedAt - now <= CLOCK_SKEW_MS;
+  var counterEvent = event === 'SubagentStart' || event === 'SubagentStop';
+  if (late && !counterEvent) return null;
 
   var subagents = prev && typeof prev.subagents === 'number' && prev.subagents > 0 ? prev.subagents : 0;
   var prevState = prev && typeof prev.state === 'string' ? prev.state : 'idle';
@@ -87,7 +97,7 @@ function computeNext(prev, event, input, now) {
     event: event,
     project: typeof input.cwd === 'string' ? path.basename(input.cwd) : (prev && prev.project) || '',
     subagents: subagents,
-    updatedAt: now
+    updatedAt: late ? prev.updatedAt : now
   };
   if (TOOL_EVENTS[event] && typeof input.tool_name === 'string') rec.tool = input.tool_name.slice(0, 64);
   if (saved && subagents > 0) rec.prevState = saved;
@@ -110,15 +120,47 @@ function run(event, raw, now) {
     return;
   }
 
-  var prev = null;
-  try { prev = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { prev = null; }
-  var next = computeNext(prev, event, input, now);
-  if (!next) return;
-
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  var tmp = file + '.' + process.pid + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(next), { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  withLock(file + '.lock', function () {
+    var prev = null;
+    try { prev = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { prev = null; }
+    var next = computeNext(prev, event, input, now);
+    if (!next) return;
+    var tmp = file + '.' + process.pid + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(next), { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  });
+}
+
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// Serializa o ler-modificar-gravar entre hooks concorrentes (ex.: SubagentStart paralelos).
+// Nunca bloqueia o Claude: se o lock não vier em LOCK_WAIT_MS, segue sem ele.
+function withLock(lockPath, fn) {
+  var deadline = Date.now() + LOCK_WAIT_MS;
+  var fd = null;
+  while (fd === null) {
+    try {
+      fd = fs.openSync(lockPath, 'wx', 0o600);
+    } catch (e) {
+      if (e.code !== 'EEXIST') break;
+      try {
+        if (Date.now() - fs.statSync(lockPath).mtimeMs > LOCK_STALE_MS) fs.unlinkSync(lockPath);
+      } catch (e2) { /* sumiu entre o stat e o unlink */ }
+      if (Date.now() > deadline) break;
+      sleepMs(5);
+    }
+  }
+  try {
+    fn();
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch (e) { /* ignora */ }
+      try { fs.unlinkSync(lockPath); } catch (e) { /* ignora */ }
+    }
+  }
 }
 
 function readStdin(timeoutMs, done) {
@@ -138,7 +180,9 @@ function readStdin(timeoutMs, done) {
 
 function main() {
   process.on('uncaughtException', function () { process.exit(0); });
-  var startedAt = Date.now();
+  // Momento em que o processo nasceu: o boot do node (~20 ms, variável) não entra no carimbo,
+  // então hooks disparados em sequência mantêm a ordem.
+  var startedAt = Date.now() - Math.round(process.uptime() * 1000);
   var event = process.argv[2];
   readStdin(STDIN_TIMEOUT_MS, function (raw) {
     try { run(event, raw, startedAt); } catch (e) { /* nunca atrapalha o Claude */ }

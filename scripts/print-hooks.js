@@ -6,7 +6,7 @@ const path = require('path');
 
 const EVENTS = [
   'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure',
-  'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact', 'Notification', 'Stop', 'SessionEnd',
+  'SubagentStart', 'SubagentStop', 'PreCompact', 'PostCompact', 'Notification', 'Stop', 'StopFailure', 'SessionEnd',
 ];
 
 function shq(s) {

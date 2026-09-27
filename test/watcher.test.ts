@@ -45,14 +45,17 @@ test('readSessions apaga arquivos com mais de 24 h', () => {
   const old = write(dir, 'old.json', rec('old', now - DAY - 1));
   const lixo = write(dir, 'lixo.json', 'não é json');
   const oldTmp = write(dir, 'a.json.9.tmp', 'x');
+  const oldLock = write(dir, 'a.json.lock', '');
   const past = (now - DAY - 60_000) / 1000;
   fs.utimesSync(lixo, past, past);
   fs.utimesSync(oldTmp, past, past);
+  fs.utimesSync(oldLock, past, past);
   const fresh = write(dir, 'fresh.json', rec('fresh', now));
   assert.deepEqual(readSessions(dir, now).map((r) => r.sessionId), ['fresh']);
   assert.equal(fs.existsSync(old), false);
   assert.equal(fs.existsSync(lixo), false);
   assert.equal(fs.existsSync(oldTmp), false);
+  assert.equal(fs.existsSync(oldLock), false);
   assert.equal(fs.existsSync(fresh), true);
 });
 
