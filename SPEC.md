@@ -149,7 +149,7 @@ Opções do `BrowserWindow`:
 }
 ```
 
-- **A janela tem exatamente o tamanho do sprite.** No Linux, `setIgnoreMouseEvents(true, { forward: true })` não encaminha o movimento do mouse (o `forward` só funciona no macOS e no Windows). Por isso a v1 não tem click-through: a janela é pequena, e os cantos transparentes bloquearem clique é aceitável.
+- **A janela é quadrada e do tamanho do viewBox inteiro**, o que deixa muito espaço transparente em volta do corpo (props e animações ocupam ali). `setIgnoreMouseEvents(true, { forward: true })` não encaminha o movimento do mouse no Linux, então não há click-through dinâmico. Em vez disso, `win.setShape()` recorta a janela (no X11 é a shape de bounding) para a caixa de cada sprite, definida em `hitboxes` no `theme.json` em unidades do viewBox, mais a caixa do sprite `drag`. Fora dessa caixa o clique passa para a janela de baixo. As caixas foram medidas varrendo todas as animações CSS de cada SVG; ao trocar ou editar um SVG, meça de novo, senão o desenho é cortado.
 - `alwaysOnTop` com o nível `'screen-saver'`, se o `'floating'` padrão ficar atrás de alguma coisa.
 - **Arrastar:** manual, via `mousedown`/`mousemove` → IPC → `win.setPosition`, mostrando o sprite `drag` (detalhes na seção 5). Clique-duplo e clique-direito ficam desligados na v1.
 - **Posição:** salva em `~/.clawd-mini/prefs.json` ao soltar o arraste e restaurada ao abrir. Se a posição salva cair fora de qualquer tela (monitor desconectado), volta para o canto inferior direito da tela principal.

@@ -12,11 +12,17 @@ export interface IdleVariation {
   durationMs: number;
 }
 
+// [x0, y0, x1, y1] em unidades do viewBox do tema.
+export type Box = [number, number, number, number];
+
 export interface Theme {
   name: string;
   dir: string;
+  viewBox: Box;
   states: Record<SpriteKey, string>;
   idleVariations: IdleVariation[];
+  // Região do sprite que recebe clique; o resto da janela fica transparente ao mouse.
+  hitboxes: Record<string, Box>;
 }
 
 const FILE_RE = /^clawd-[a-z0-9-]+\.svg$/;
@@ -26,6 +32,8 @@ export function loadTheme(dir: string): Theme {
     name?: unknown;
     states?: Record<string, unknown>;
     idleVariations?: unknown;
+    viewBox?: unknown;
+    hitboxes?: Record<string, unknown>;
   };
 
   const checkFile = (f: unknown, label: string): string => {
@@ -47,7 +55,20 @@ export function loadTheme(dir: string): Theme {
     return { file: checkFile(v.file, `idleVariations[${i}]`), durationMs: v.durationMs };
   });
 
-  return { name: typeof raw.name === 'string' ? raw.name : path.basename(dir), dir, states, idleVariations };
+  const nums = (v: unknown, n: number): number[] | null =>
+    Array.isArray(v) && v.length === n && v.every((x) => typeof x === 'number' && Number.isFinite(x)) ? v : null;
+  const vb = typeof raw.viewBox === 'string' ? nums(raw.viewBox.trim().split(/\s+/).map(Number), 4) : null;
+  if (!vb || vb[2] <= 0 || vb[3] <= 0) throw new Error('theme.json: "viewBox" ausente ou inválido');
+  const viewBox: Box = [vb[0], vb[1], vb[0] + vb[2], vb[1] + vb[3]];
+
+  const hitboxes: Record<string, Box> = {};
+  for (const [f, v] of Object.entries(raw.hitboxes ?? {})) {
+    const b = nums(v, 4);
+    if (!b || b[2] <= b[0] || b[3] <= b[1]) throw new Error(`theme.json: hitboxes["${f}"] inválido`);
+    hitboxes[f] = b as Box;
+  }
+
+  return { name: typeof raw.name === 'string' ? raw.name : path.basename(dir), dir, viewBox, states, idleVariations, hitboxes };
 }
 
 export function themeFiles(t: Theme): string[] {

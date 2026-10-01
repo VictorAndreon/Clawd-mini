@@ -24,5 +24,26 @@
     { "file": "clawd-idle-look.svg",    "durationMs": 6500 },
     { "file": "clawd-idle-bubble.svg",  "durationMs": 13500 },
     { "file": "clawd-idle-reading.svg", "durationMs": 14000 }
-  ]
+  ],
+  "hitboxes": {
+    "clawd-collapse-sleep.svg": [-2.5, 6.0, 17.5, 17.0],
+    "clawd-error.svg": [-2.5, 1.5, 19.0, 17.5],
+    "clawd-happy.svg": [-1.5, -7.0, 16.5, 17.0],
+    "clawd-headphones-groove.svg": [-2.5, 1.5, 17.5, 17.0],
+    "clawd-idle-bubble.svg": [-1.0, -6.5, 25.5, 17.0],
+    "clawd-idle-doze.svg": [-2.0, 6.0, 17.0, 17.0],
+    "clawd-idle-follow.svg": [-1.5, 5.0, 16.5, 17.0],
+    "clawd-idle-look.svg": [-2.5, 3.5, 17.5, 17.0],
+    "clawd-idle-reading.svg": [-2.5, -10.0, 16.5, 19.5],
+    "clawd-idle-yawn.svg": [-2.5, 2.5, 17.5, 17.0],
+    "clawd-notification.svg": [-7.0, -7.5, 16.0, 17.0],
+    "clawd-react-drag.svg": [-2.0, 4.5, 17.0, 17.0],
+    "clawd-sleeping.svg": [-2.5, 6.5, 17.5, 17.0],
+    "clawd-wake.svg": [-2.5, -1.5, 17.5, 17.0],
+    "clawd-working-building.svg": [-6.5, -3.0, 24.0, 19.0],
+    "clawd-working-juggling.svg": [-2.0, -3.5, 17.0, 17.0],
+    "clawd-working-sweeping.svg": [-7.5, -2.0, 18.0, 18.5],
+    "clawd-working-thinking.svg": [-4.0, -8.5, 20.0, 17.0],
+    "clawd-working-typing.svg": [-1.5, -7.5, 16.5, 17.5]
+  }
 }

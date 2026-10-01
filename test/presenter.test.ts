@@ -9,7 +9,7 @@ const VARS: IdleVariation[] = [{ file: 'var-a.svg', durationMs: 1_000 }, { file:
 
 function theme(idleVariations: IdleVariation[] = VARS): Theme {
   const states = Object.fromEntries(SPRITE_KEYS.map((k) => [k, `${k}.svg`])) as Record<SpriteKey, string>;
-  return { name: 't', dir: '/x', states, idleVariations };
+  return { name: 't', dir: '/x', viewBox: [0, 0, 1, 1], states, idleVariations, hitboxes: {} };
 }
 function agg(state: State, lastEventAt: number, key: BaseKey = state): Aggregate {
   return { state, key, lastEventAt, active: state === 'idle' ? 0 : 1 };
