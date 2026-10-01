@@ -29,7 +29,7 @@ function fakeTheme(states: Record<string, string>): string {
   for (const f of new Set(Object.values(states))) {
     if (/^[\w.-]+$/.test(f)) fs.writeFileSync(path.join(dir, f), '<svg/>');
   }
-  fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify({ name: 'x', states, idleVariations: [] }));
+  fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify({ name: 'x', viewBox: '0 0 10 10', states, idleVariations: [] }));
   return dir;
 }
 const full = (): Record<string, string> => Object.fromEntries(SPRITE_KEYS.map((k) => [k, `clawd-${k}.svg`]));
@@ -48,4 +48,13 @@ test('loadTheme acusa arquivo ausente', () => {
   const dir = fakeTheme(full());
   fs.unlinkSync(path.join(dir, 'clawd-error.svg'));
   assert.throws(() => loadTheme(dir), /clawd-error\.svg/);
+});
+
+test('loadTheme rejeita viewBox ausente', () => {
+  const dir = fakeTheme(full());
+  const raw = JSON.parse(fs.readFileSync(path.join(dir, 'theme.json'), 'utf8'));
+  fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify({ ...raw, viewBox: undefined }));
+  assert.throws(() => loadTheme(dir), /viewBox/);
+  fs.writeFileSync(path.join(dir, 'theme.json'), JSON.stringify({ ...raw, viewBox: '0 0 10 10', hitboxes: { 'a.svg': [5, 5, 1, 1] } }));
+  assert.throws(() => loadTheme(dir), /hitboxes/);
 });

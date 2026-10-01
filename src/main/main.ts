@@ -7,6 +7,7 @@ import { Presenter } from './presenter';
 import { loadTheme, themeFiles, Theme } from './theme';
 import { loadPrefs, Prefs, Rect, resolvePosition, savePrefs } from './prefs';
 import { installDrag } from './drag';
+import { hitRect } from './hitbox';
 import { createTray, TrayHandle } from './tray';
 import { APP_ROOT, PREFS_FILE, SESSIONS_DIR } from './paths';
 import { degradedDisplayWarning } from './platform';
@@ -64,6 +65,15 @@ function start(): void {
   screen.on('display-added', reposition);
   screen.on('display-metrics-changed', reposition);
 
+  // A janela é grande pra caber props e animações, mas só a área desenhada recebe clique.
+  // A caixa do sprite 'drag' entra sempre: o arraste pode começar em qualquer estado e o
+  // renderer troca para esse sprite sem avisar o main.
+  const applyHitbox = (file: string): void => {
+    const boxes = [theme.hitboxes[file], theme.hitboxes[theme.states.drag]].filter((b) => b !== undefined);
+    const rect = hitRect(theme.viewBox, boxes, prefs.size);
+    win.setShape([rect ?? { x: 0, y: 0, width: prefs.size, height: prefs.size }]);
+  };
+
   let records: SessionRecord[] = [];
   let shown = '';
   const render = (): void => {
@@ -72,6 +82,7 @@ function start(): void {
     const file = presenter.tick(aggregate(records, now), now);
     if (file !== shown) {
       shown = file;
+      applyHitbox(file);
       win.webContents.send('sprite', file);
     }
   };
